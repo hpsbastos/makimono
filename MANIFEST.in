@@ -1,0 +1,6 @@
+include LICENSE
+include README.rst
+include docs/*.txt
+include docs/*.ipynb
+include makimono/data.json
+

@@ -1,0 +1,141 @@
+#!/usr/bin/env python
+
+import argparse, os
+from math import log
+from makimono import toolbox, plotter
+
+# -------------------------------------------------------------------------------------------------
+
+def plot_chooser(**kwargs):
+
+    """
+    Processes the selected output type: matlibplot, bokeh plot or bokeh plot plus      
+    """
+   
+    if kwargs["mode"] == "mpl":
+
+        mlp = plotter.Mlplot(kwargs["tp"], kwargs["xticks"])
+        mlp.plot_mpl_figure(kwargs["group"], name=kwargs["name"], savelocation=kwargs["save"])
+
+    elif kwargs["mode"] == "bokeh":
+        bkp = plotter.Blur(kwargs["tp"], kwargs["xticks"])
+        bkp.generate_interactive_bokeh_plot(kwargs["group"], kwargs["name"], kwargs["save"],
+                                         annots=kwargs["annots"], portability=kwargs["port"])
+
+    elif kwargs["mode"] == "bokehplus":
+
+        bkp = plotter.Blur(kwargs["tp"], kwargs["xticks"])
+        bkp.generate_interactive_bokeh_plot(kwargs["group"], kwargs["name"],
+                                    kwargs["save"], annots=kwargs["annots"],
+                                    plus=kwargs["plus"], portability=kwargs["port"]) 
+    else:
+        pass
+
+# =================================================================================================
+
+if __name__ == "__main__":
+
+
+    parser = argparse.ArgumentParser(conflict_handler='resolve')
+
+
+    parser.add_argument('-p', '--plotmode', help='Chooses the plot engine/type; output mode',
+                        choices=['mpl','bokeh','bokehplus'], required=True)
+
+    parser.add_argument('-e', '--expression', help='Gene/transcript expression levels .tsv file',
+                        type=argparse.FileType('r'), required=True)
+    parser.add_argument('-r', '--replicates',  help='Indicate the number of replicates', type=int,
+                        required=True)
+    parser.add_argument('-t','--timepoints', nargs='+', help='List of experimental time points',
+                        required=True)
+
+    parser.add_argument('-i', '--input', help='''Path to input file or directory with input files 
+                        (for batch processing)''', action='store', required=True)
+
+    # --------------------------------------------------------------------------------------------
+
+    parser.add_argument('-a', '--alpha',  help='Indicate statistical significance', type=float)    
+    parser.add_argument('-xk','--xticks', nargs='+', help='List of x-axis ticks')
+    parser.add_argument('-m', '--mode', help='Chooses the resultfile portability mode', 
+                        choices=['all','web','batch'])
+    parser.add_argument('-o', '--outputfolder', help='Directory where output files will be saved',
+                        action='store')
+
+    args = parser.parse_args()
+
+# =================================================================================================
+
+    # Try to take care of non-mandatory input arguments
+    # that is, (hopefully) create reasonable defaults
+    if args.outputfolder is None:
+        args.outputfolder = os.path.expanduser("~")
+
+    if args.xticks is None:
+        args.xticks = args.timepoints
+
+    if args.mode is None:
+        args.mode = "web"
+
+    if args.alpha is None:
+        args.alpha = 0.05
+
+
+    data = toolbox.process_expression_values(args.expression, args.replicates)
+
+    # =============================================================================================
+    # If INPUT is a file...  [SINGLE-FILE OPTION]
+    # ============================================================================================= 
+    if os.path.isfile(args.input):
+    
+        path, f = os.path.split(args.input)
+        annotDict = toolbox.read_annotation_file(path, f)
+
+        # TODO: implement option to choose log mode as separate param
+        if args.plotmode == "bokeh" or args.plotmode == "bokehplus":
+            subset = {k: [log(x) for x in data[k]] for k in annotDict.keys()}
+        else:
+            subset = {k: data[k] for k in annotDict.keys()}
+
+        # Enrichment data retrieval depends on a strict directory structure
+        plus = toolbox.process_enrichment_values(path, os.path.splitext(f)[0], args.alpha)
+
+        plot_chooser(mode=args.plotmode, group=subset, tp=args.timepoints, xticks=args.xticks,
+                     name=os.path.splitext(f)[0], save=args.outputfolder, annots=annotDict, 
+                     plus=plus, port=args.mode)
+
+    # =============================================================================================
+    # If INPUT is a directory with transcript/gene lists files... [BULK OPTION]
+    # =============================================================================================
+    elif os.path.isdir(args.input):
+
+        fileslist = [f for f in os.listdir(args.input) if 
+                        os.path.isfile(os.path.join(args.input, f))]
+        fileslist.sort(reverse=True)
+
+        for f in fileslist:
+            annotDict = toolbox.read_annotation_file(args.input, f)
+
+            # TODO: implement option to select log vs normal mode
+            if args.plotmode == "bokeh" or args.plotmode == "bokehplus":
+                subset = {k: [log(x) for x in data[k]] for k in annotDict.keys()}
+            else:
+                subset = {k: data[k] for k in annotDict.keys()}
+
+            # Enrichment data retrieval depends on a strict directory structure
+            plus = toolbox.process_enrichment_values(args.input, os.path.splitext(f)[0], args.alpha)
+
+            plot_chooser(mode=args.plotmode, group=subset, tp=args.timepoints, xticks=args.xticks,
+                         name=os.path.splitext(f)[0], save=args.outputfolder, annots=annotDict,
+                         plus=plus, port=args.mode)
+    else:
+        print "There is something wrong with your input!"
+        sys.exit()
+
+
+
+
+
+
+
+
+    
