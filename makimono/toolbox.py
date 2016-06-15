@@ -21,7 +21,7 @@ def read_annotation_file(directory, f):
 
     annotDict = {}
 
-    patt = re.compile('^([a-z-0-9\.]+)\t(.*)', re.IGNORECASE)
+    patt = re.compile('^(\S+)\t(.*)', re.IGNORECASE)
 
     with codecs.open(os.path.join(directory,f), encoding='latin-1') as fh:
         for line in fh:
