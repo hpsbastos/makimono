@@ -4,6 +4,8 @@
 import os, sys, re, codecs, json
 import pandas as pd
 
+pd.set_option('display.max_colwidth', -1)
+
 """
 Collection of 'orphan' functions, that are either required
 by some methods or that are helpful for pipelining.
@@ -96,7 +98,10 @@ def read_tsv(tsvpath, ont):
     """
 
     try:
-        df = pd.read_csv(tsvpath, sep="\t")
+        if ont != "KEGG Pathways":
+            df = pd.read_csv(tsvpath, sep="\t")
+        else:
+            df = pd.read_csv(tsvpath, sep="\t", converters={'KEGGID': lambda x: str(x)})
     except:
         f = os.path.splitext(os.path.basename(tsvpath))[0]
         print "No %s enrichment found for %s!" % (ont, f)

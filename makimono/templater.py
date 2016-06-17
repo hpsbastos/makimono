@@ -6,6 +6,9 @@ import pandas as pd
 from jinja2 import Template
 from bokeh.resources import INLINE
 
+pd.set_option('display.max_colwidth', -1)
+pd.options.mode.chained_assignment = None  # default='warn'
+
 class Templater(object):
 
     def __init__(self, script, div, title, annot):
@@ -238,7 +241,8 @@ class Templater(object):
         if gobp is not None:
             bpslice = gobp.loc[gobp['elimFisher'] < alpha]
             if len(bpslice) > 0:
-                gobptable = bpslice.to_html(index=False, classes="etables")
+                bpslice["GO.ID"] = bpslice["GO.ID"].map(lambda x: '<a href="http://amigo.geneontology.org/amigo/term/'+str(x)+'" target="_blank">'+str(x)+'</a>')
+                gobptable = bpslice.to_html(index=False, classes="etables", escape=False)
             else:
                 gobptable = self.not_found_response()
         else:
@@ -247,7 +251,8 @@ class Templater(object):
         if gomf is not None:
             mfslice = gomf.loc[gomf['elimFisher'] < alpha]
             if len(mfslice) > 0:
-                gomftable = mfslice.to_html(index=False, classes="etables")
+                mfslice["GO.ID"] = mfslice["GO.ID"].map(lambda x: '<a href="http://amigo.geneontology.org/amigo/term/'+str(x)+'" target="_blank">'+str(x)+'</a>')
+                gomftable = mfslice.to_html(index=False, classes="etables", escape=False)
             else:
                 gomftable = self.not_found_response()
         else:
@@ -256,16 +261,18 @@ class Templater(object):
         if gocc is not None:
             ccslice = gocc.loc[gocc['elimFisher'] < alpha]
             if len(ccslice) > 0:
-                gocctable = ccslice.to_html(index=False, classes="etables")
+                ccslice["GO.ID"] = ccslice["GO.ID"].map(lambda x: '<a href="http://amigo.geneontology.org/amigo/term/'+str(x)+'" target="_blank">'+str(x)+'</a>')
+                gocctable = ccslice.to_html(index=False, classes="etables", escape=False)
             else:
                 gocctable = self.not_found_response()
         else:
             gocctable = self.not_found_response()
 
         if kegg is not None:
-            # changes the column order of the KEGG enrichment results 
+            # changes the column order of the KEGG enrichment results
+            kegg["KEGGID"] = kegg["KEGGID"].map(lambda x: '<a href="http://www.genome.jp/dbget-bin/www_bget?pathway:map'+str(x)+'" target="_blank">'+str(x)+'</a>') 
             cols = ['KEGGID', 'Term', 'Size', 'Count', 'ExpCount', 'OddsRatio', 'Pvalue']
-            keggtable = kegg[cols].to_html(index=False, classes="etables")
+            keggtable = kegg[cols].to_html(index=False, classes="etables", escape=False)
         else:
             keggtable = self.not_found_response()
 
