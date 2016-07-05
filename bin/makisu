@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import argparse, os, sys
+import argparse, os, sys, json
 from math import log
 from makimono import toolbox, plotter
 
@@ -54,6 +54,9 @@ if __name__ == "__main__":
 
     # --------------------------------------------------------------------------------------------
 
+    parser.add_argument('-j', '--json_annot', help='JSON file with all GO/KEGG annotation',
+                        type=argparse.FileType('r')) #TODO: document this change
+
     parser.add_argument('-a', '--alpha',  help='Indicate statistical significance', type=float)    
     parser.add_argument('-xk','--xticks', nargs='+', help='List of x-axis ticks')
     parser.add_argument('-m', '--mode', help='Chooses the resultfile portability mode', 
@@ -103,6 +106,9 @@ if __name__ == "__main__":
                      name=os.path.splitext(f)[0], save=args.outputfolder, annots=annotDict, 
                      plus=plus, port=args.mode)
 
+
+
+
     # =============================================================================================
     # If INPUT is a directory with transcript/gene lists files... [BULK OPTION]
     # =============================================================================================
@@ -112,17 +118,35 @@ if __name__ == "__main__":
                         os.path.isfile(os.path.join(args.input, f))]
         fileslist.sort(reverse=True)
 
+        # TODO: Make this process sleeker...
+        if args.json_annot:
+            with args.json_annot as fh:
+                janotas = fh.readlines()
+            jannots["annots"] = janotas[0]
+
+
         for f in fileslist:
             annotDict = toolbox.read_annotation_file(args.input, f)
 
             # TODO: implement option to select log vs normal mode
             if args.plotmode == "bokeh" or args.plotmode == "bokehplus":
                 subset = {k: [log(x) for x in data[k]] for k in annotDict.keys()}
+                #TODO: testing...
+                try:
+                    jannots["genes"] = json.dumps(annotDict.keys())
+
             else:
                 subset = {k: data[k] for k in annotDict.keys()}
 
             # Enrichment data retrieval depends on a strict directory structure
             plus = toolbox.process_enrichment_values(args.input, os.path.splitext(f)[0], args.alpha)
+
+            # TODO: Change the piggyback here...?
+            if jannots:
+                plus.update(jannots)
+            
+
+
 
             plot_chooser(mode=args.plotmode, group=subset, tp=args.timepoints, xticks=args.xticks,
                          name=os.path.splitext(f)[0], save=args.outputfolder, annots=annotDict,

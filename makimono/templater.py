@@ -51,14 +51,25 @@ class Templater(object):
         elif portability == "web":
 
             css_resources = '''
-                <link rel="stylesheet" href="https://cdn.pydata.org/bokeh/release/bokeh-0.11.1.min.css" type="text/css" />'''+csstables
+                <link rel="stylesheet" href="https://cdn.pydata.org/bokeh/release/bokeh-0.11.1.min.css" type="text/css" />
+                <link rel="stylesheet" href="http://code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+                '''+csstables
+
             js_resources = '''
-                <script type="text/javascript" src="https://cdn.pydata.org/bokeh/release/bokeh-0.11.1.min.js"></script>
-                <script type="text/javascript">
-                    Bokeh.set_log_level("info");
-                </script>
+                            <script type="text/javascript" src="support/annotations.js"></script>
+
+                            <script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+                            <script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+
+                            <script type="text/javascript" src="https://cdn.pydata.org/bokeh/release/bokeh-0.11.1.min.js">
+                            </script>
+                            <script type="text/javascript">
+                                Bokeh.set_log_level("info");
+                            </script>
 
                            '''
+
+
         # or "full", meaning full portability, but at a cost of increased filesize
         else:            
             js_resources = INLINE.render_js()
@@ -76,12 +87,112 @@ class Templater(object):
             # a small hack to pass along the significance 
             # level (filter for GO enrichments)
             alpha = plus['alpha']
+
+            # TODO: testing...    
+            #jannots = plus['annots']
+            jgenes = plus['genes']
+
         else:
             bp = None
             mf = None
             cc = None
             kegg = None
             alpha = 0.05
+            # TODO: testing...    
+            #jannots = None
+            jgenes = None
+
+
+
+        # TODO: testing...
+        if jgenes is not None:
+
+
+            bigjson = '''
+            <script type="text/javascript">
+
+
+
+            $(function() {
+                    $(".dialog").dialog({
+                        autoOpen: false,
+                        });
+             
+                    $(".open_dialog").click(function(e) {
+                        e.preventDefault();
+                        
+                        var linkID = $(this).attr('id')
+                        var selector = "target" + linkID;
+
+                        // Define a new observer
+                        var obs = new MutationObserver(function(mutations, observer) {
+                          // look through all mutations that just occured
+                          for(var i=0; i<mutations.length; ++i) {
+                            // look through all added nodes of this mutation
+                            for(var j=0; j<mutations[i].addedNodes.length; ++j) {
+                              // was a child added with the selector ID? 
+                              if(mutations[i].addedNodes[j].id == selector) {
+
+                                        displayDialog(linkID);
+
+                              }
+                            }
+                          }
+                        });
+
+                        // have the observer observe the document body for changes in children
+                        obs.observe($("body").get(0), {
+                          childList: true
+                        });
+
+
+
+
+                        var $div = $("<div>", {id: selector, class: "dialog", style: "display:none;"});
+
+                        var dialogcontent = get_genes(linkID);               
+                        var output = "";
+                          for (t in dialogcontent){
+                          output += dialogcontent[t]+"</br>"
+                        }  
+                        $div.html(output);
+                        $("body").append($div);
+
+
+                        }); // closes "open_dialog" click event
+
+
+            }); // closes the function...
+
+
+
+            function displayDialog(targetDiv) {
+              var dialog = $( document.getElementById( 'target' + targetDiv ) ).dialog({
+                title: targetDiv
+              });
+            } 
+
+
+            function isInArray(value, array) {
+              return array.indexOf(value) > -1;
+            }
+
+
+            function get_genes(id){ 
+              var slice = annotmap[id];
+              var out = [];
+              for (g in slice) { 
+                if (isInArray(slice[g], genes)){
+                  out.push(slice[g]);
+                } 
+              }
+              return out;
+            }
+            '''+"var genes = "+jgenes+" \n\n "+"</script>"
+
+
+            js_resources += bigjson
+
 
 
         t_bp, t_mf, t_cc, t_kegg = self.process_enrichment_dict(bp, mf, cc, kegg, alpha)
@@ -192,7 +303,11 @@ class Templater(object):
         all available annotations.
         """
 
-        tablegene = Template('''<span style="font-size:20px; font-weight: bold;">
+        tablegene = Template('''
+
+                        <br/>
+
+                            <span style="font-size:20px; font-weight: bold;">
                                 Genes/transcripts</span>
                             <table dir="ltr" width="1200" border="1">                   
                             <thead>
@@ -241,6 +356,10 @@ class Templater(object):
         if gobp is not None:
             bpslice = gobp.loc[gobp['elimFisher'] < alpha]
             if len(bpslice) > 0:
+
+                bpslice["Significant"] = bpslice["GO.ID"].map(str) + str(",") + bpslice["Significant"].map(str)
+                bpslice["Significant"] = bpslice["Significant"].map( lambda x: '<a id="%s" class="open_dialog" href="javascript:void(0)">%s</a> '% tuple(x.split(",")) )
+
                 bpslice["GO.ID"] = bpslice["GO.ID"].map(lambda x: '<a href="http://amigo.geneontology.org/amigo/term/'+str(x)+'" target="_blank">'+str(x)+'</a>')
                 gobptable = bpslice.to_html(index=False, classes="etables", escape=False)
             else:
@@ -251,6 +370,10 @@ class Templater(object):
         if gomf is not None:
             mfslice = gomf.loc[gomf['elimFisher'] < alpha]
             if len(mfslice) > 0:
+
+                mfslice["Significant"] = mfslice["GO.ID"].map(str) + str(",") + mfslice["Significant"].map(str)
+                mfslice["Significant"] = mfslice["Significant"].map( lambda x: '<a id="%s" class="open_dialog" href="javascript:void(0)">%s</a> '% tuple(x.split(",")) )
+
                 mfslice["GO.ID"] = mfslice["GO.ID"].map(lambda x: '<a href="http://amigo.geneontology.org/amigo/term/'+str(x)+'" target="_blank">'+str(x)+'</a>')
                 gomftable = mfslice.to_html(index=False, classes="etables", escape=False)
             else:
@@ -261,6 +384,10 @@ class Templater(object):
         if gocc is not None:
             ccslice = gocc.loc[gocc['elimFisher'] < alpha]
             if len(ccslice) > 0:
+
+                ccslice["Significant"] = ccslice["GO.ID"].map(str) + str(",") + ccslice["Significant"].map(str)
+                ccslice["Significant"] = ccslice["Significant"].map( lambda x: '<a id="%s" class="open_dialog" href="javascript:void(0)">%s</a> '% tuple(x.split(",")) )
+
                 ccslice["GO.ID"] = ccslice["GO.ID"].map(lambda x: '<a href="http://amigo.geneontology.org/amigo/term/'+str(x)+'" target="_blank">'+str(x)+'</a>')
                 gocctable = ccslice.to_html(index=False, classes="etables", escape=False)
             else:
@@ -269,8 +396,15 @@ class Templater(object):
             gocctable = self.not_found_response()
 
         if kegg is not None:
-            # changes the column order of the KEGG enrichment results
-            kegg["KEGGID"] = kegg["KEGGID"].map(lambda x: '<a href="http://www.genome.jp/dbget-bin/www_bget?pathway:map'+str(x)+'" target="_blank">'+str(x)+'</a>') 
+            
+
+            kegg["Count"] =  kegg["KEGGID"].map(str) + str(",") + kegg["Count"].map(str) 
+            kegg["Count"] = kegg["Count"].map( lambda x: '<a id="%s" class="open_dialog" href="javascript:void(0)">%s</a> '% tuple(x.split(",")) )
+
+
+            kegg["KEGGID"] = kegg["KEGGID"].map(lambda x: '<a href="http://www.genome.jp/dbget-bin/www_bget?pathway:map'+str(x)+'" target="_blank">'+str(x)+'</a>')
+
+            # changes the column order of the KEGG enrichment results 
             cols = ['KEGGID', 'Term', 'Size', 'Count', 'ExpCount', 'OddsRatio', 'Pvalue']
             keggtable = kegg[cols].to_html(index=False, classes="etables", escape=False)
         else:
